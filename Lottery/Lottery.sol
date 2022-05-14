@@ -4,7 +4,7 @@ pragma solidity >=0.7.0 <0.9.0;
 // We can use 'receive()' only once in contract
 // used to receive ether or amount send by external user
 
-    contract Lottery{
+    contract Lottery {
         address public manager;
         address payable[] participents;
 
