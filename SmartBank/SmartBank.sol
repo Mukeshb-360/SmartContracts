@@ -7,11 +7,20 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 
 contract SmartBank is Ownable {
 
+    address public owner;
     uint private bankBalance = 0;
     mapping(address => uint) public accountVsBalance;
     mapping(address => timeStamp) timeStamps;
     using SafeMath for uint;
 
+    constructor() {
+        owner == msg.sender;
+    }
+
+    modifier OnlyDepositors{
+        require(accountVsBalance[msg.sender] != 0, "You havent made any deposits yet");
+        _;
+    }
     struct timeStamp {
         uint[] deepositeTime;
         uint[] withdrawTime;
@@ -21,14 +30,14 @@ contract SmartBank is Ownable {
         return bankBalance;
     }
 
-    function depositMoney(address payable _accNumber, uint _amount) public payable {
-        accountVsBalance[_accNumber] = _amount;
+    function depositMoney(uint _amount) public payable {
+        accountVsBalance[msg.sender] = _amount;
         bankBalance =bankBalance.add(_amount);
-        timeStamp storage ts = timeStamps[_accNumber];
+        timeStamp storage ts = timeStamps[msg.sender];
         ts.deepositeTime.push(block.timestamp);
     }
 
-    function getAddressBalance(address _accNumber) internal view returns(uint){
+    function getAddressBalance(address _accNumber) internal view OnlyDepositors returns(uint){
         uint principalAmount = accountVsBalance[_accNumber];
         timeStamp storage ts = timeStamps[_accNumber];
         uint timeLapsed = block.timestamp - ts.deepositeTime[0];
@@ -36,9 +45,7 @@ contract SmartBank is Ownable {
         return principalAmount + interestAmount;
     }
 
-    function withdrawMoney(uint _amount) public payable{
-       // check - weather caller did any deposits or not 
-       require(accountVsBalance[msg.sender] != 0, "You havent made any deposits yet");
+    function selfTransfer(uint _amount) public OnlyDepositors {
        uint amountAvailableToWithdraw = getAddressBalance(msg.sender);
        console.log("amountAvailableToWithdraw : ", amountAvailableToWithdraw);
        // check - requested amount should be less than withdrawable amount
@@ -52,5 +59,20 @@ contract SmartBank is Ownable {
        timeStamp storage ts = timeStamps[msg.sender];
        // add withdraw time to array 
        ts.withdrawTime.push(block.timestamp);
+    }
+
+    function transferMoney(address _to, uint _amount) public OnlyDepositors {
+        uint amountAvailableToWithdraw = getAddressBalance(msg.sender);
+        require(amountAvailableToWithdraw >= _amount, "Insufficent Funds");
+        accountVsBalance[msg.sender] -=_amount;
+       // transfer funds to the requested account 
+       (bool success, ) = _to.call{value: _amount}("");
+       require(success, "Transfer failed.");
+       timeStamp storage ts = timeStamps[msg.sender];
+       ts.withdrawTime.push(block.timestamp);
+    }
+
+    function shutTheBank(address _add) public onlyOwner { 
+        selfdestruct(owner); 
     }
 }
